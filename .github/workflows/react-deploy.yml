@@ -32,7 +32,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             echo "🚀 Updating source repo on EC2..."
-            cd /home/ubuntu/memes_app_frontend
+            cd /home/ubuntu/
             if [ -d .git ]; then
               git fetch origin main
               git reset --hard origin/main
@@ -47,7 +47,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "build/*"
-          target: "/home/ubuntu/memes_app_frontend/build/"
+          target: "/home/ubuntu//build/"
 
       - name: 🔄 Reload Nginx
         uses: appleboy/ssh-action@v1.0.3
