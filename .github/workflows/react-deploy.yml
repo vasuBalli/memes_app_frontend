@@ -45,7 +45,7 @@ jobs:
             echo "🚀 Pulling latest code from GitHub..."
             if [ -d .git ]; then
               git fetch origin main
-              git full origin main
+              git pull origin main
             else
               echo "⚠️ No .git directory found — skipping git pull"
             fi
