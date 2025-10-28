@@ -23,8 +23,8 @@ jobs:
             cd /home/ubuntu/react_app
 
             echo "🌀 Pulling latest code..."
-            git fetch origin main
-            git reset --hard origin/main
+            git pull origin main
+           
 
             echo "📦 Installing dependencies..."
             npm install
