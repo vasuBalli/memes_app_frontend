@@ -82,8 +82,8 @@ export function MemeCard({
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 ring-2 ring-zinc-100 dark:ring-zinc-800">
             <AvatarImage src={userAvatar} alt={username} />
-            {/* <AvatarFallback>{username?username.charAt(0).toUpperCase():""}</AvatarFallback> */}
-            <AvatarFallback>{title}</AvatarFallback>
+            <AvatarFallback>{username?username.charAt(0).toUpperCase():""}</AvatarFallback>
+            <AvatarFallback>{title}</AvatarFallback> {/* testing purpose */}
           </Avatar>
           <div className="flex flex-col">
             <span className="text-sm text-zinc-900 dark:text-white">{username}</span>
