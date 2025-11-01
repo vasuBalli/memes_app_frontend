@@ -11,6 +11,8 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Badge } from './ui/badge';
+import { UploadModal } from './uploadModal';
+
 
 export function Header() {
   return (
@@ -50,19 +52,21 @@ export function Header() {
 
           {/* Right Section */}
           <div className="flex items-center gap-2">
-            <Button 
+            {/* <Button 
               className="hidden sm:flex gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
             >
               <Plus className="h-4 w-4" />
               Upload
-            </Button>
-            
+            </Button> */}
+            <UploadModal />
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
               <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center bg-red-500 text-white text-xs">
                 3
               </Badge>
             </Button>
+            
+            
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
