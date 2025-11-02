@@ -52,12 +52,6 @@ export function Header() {
 
           {/* Right Section */}
           <div className="flex items-center gap-2">
-            {/* <Button 
-              className="hidden sm:flex gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-            >
-              <Plus className="h-4 w-4" />
-              Upload
-            </Button> */}
             <UploadModal />
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
