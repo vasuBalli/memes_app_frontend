@@ -9,7 +9,7 @@ interface MasonryCardProps {
   type: 'image' | 'video';
   imageUrl?: string;
   caption: string;
-  username: string;
+  user_name: string;
   userAvatar: string;
   likes: number;
   comments: number;
@@ -22,7 +22,7 @@ export function MasonryCard({
   type,
   imageUrl,
   caption,
-  username,
+  user_name,
   userAvatar,
   likes: initialLikes,
   comments,
@@ -114,10 +114,10 @@ export function MasonryCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
-              <AvatarImage src={userAvatar} alt={username} />
-              <AvatarFallback className="text-xs">{username.charAt(0).toUpperCase()}</AvatarFallback>
+              <AvatarImage src={userAvatar} alt={user_name} />
+              <AvatarFallback className="text-xs">{user_name.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <span className="text-xs text-zinc-600 dark:text-zinc-400">{username}</span>
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">{user_name}</span>
           </div>
           
           <button

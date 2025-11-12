@@ -54,10 +54,10 @@
       outDir: 'build',
     },
     server: {
-      port: 3000,
+      port: 5500,
       open: true,
        proxy: {
-      "/api": "http://43.205.128.213",
+      "/api": "https://getdownload.site",
     }
     },
   });

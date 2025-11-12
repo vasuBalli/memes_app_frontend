@@ -9,7 +9,7 @@ interface Meme {
   // imageUrl?: string;
   // videoUrl?: string;
   // caption: string;
-  // username: string;
+  // user_name: string;
   // userAvatar: string;
   // likes: number;
   // comments: number;
@@ -19,7 +19,7 @@ interface Meme {
   title: string;
   file_url: string;
   caption: string;
-  username: string;
+  user_name: string;
   userAvatar: string;
   likes: number;
   comments: number;
