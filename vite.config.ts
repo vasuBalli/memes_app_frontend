@@ -57,7 +57,7 @@
       port: 5500,
       open: true,
        proxy: {
-      "/api": "https://getdownload.site",
+      "/api": "https://getdownload.site/",
     }
     },
   });

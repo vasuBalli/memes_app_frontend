@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Heart, MessageCircle, Eye, Play } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 
 interface MasonryCardProps {
   type: 'image' | 'video';
-  imageUrl?: string;
+  file_url?: string; // changed to match App's prop name
   caption: string;
   user_name: string;
   userAvatar: string;
@@ -16,11 +16,13 @@ interface MasonryCardProps {
   views?: number;
   category?: string;
   onClick?: () => void;
+  // new prop to attach the actual video element ref
+  videoRef?: (el: HTMLVideoElement | null) => void;
 }
 
 export function MasonryCard({
   type,
-  imageUrl,
+  file_url,
   caption,
   user_name,
   userAvatar,
@@ -29,18 +31,21 @@ export function MasonryCard({
   views,
   category,
   onClick,
+  videoRef,
 }: MasonryCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [likes, setLikes] = useState(initialLikes);
   const [isHovered, setIsHovered] = useState(false);
 
   const handleLike = (e: React.MouseEvent) => {
+    // Prevent the like button click from bubbling up to the card click (which may open reels)
     e.stopPropagation();
+
     if (isLiked) {
-      setLikes(likes - 1);
+      setLikes((l) => l - 1);
       setIsLiked(false);
     } else {
-      setLikes(likes + 1);
+      setLikes((l) => l + 1);
       setIsLiked(true);
     }
   };
@@ -56,14 +61,26 @@ export function MasonryCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Image */}
+      {/* Media */}
       <div className="relative overflow-hidden">
-        <ImageWithFallback
-          src={imageUrl || ''}
-          alt={caption}
-          className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
-        />
-        
+        {type === 'video' ? (
+          <video
+            ref={videoRef}
+            src={file_url}
+            muted // default muted; clicking card toggles mute in App
+            playsInline
+            // don't show native controls — keep UI consistent
+            controls={false}
+            className="w-full h-48 md:h-56 lg:h-48 object-cover"
+          />
+        ) : (
+          <ImageWithFallback
+            src={file_url || ''}
+            alt={caption}
+            className="w-full h-48 md:h-56 lg:h-48 object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        )}
+
         {/* Overlay on hover */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -73,16 +90,20 @@ export function MasonryCard({
           <div className="flex items-center gap-4 text-white w-full">
             <div className="flex items-center gap-2">
               <Heart className={`h-5 w-5 ${isLiked ? 'fill-current text-red-500' : ''}`} />
-              <span className="text-sm">{likes > 999 ? `${(likes / 1000).toFixed(1)}K` : likes}</span>
+              <span className="text-sm">
+                {likes > 999 ? `${(likes / 1000).toFixed(1)}K` : likes}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5" />
               <span className="text-sm">{comments}</span>
             </div>
-            {views && (
+            {views !== undefined && (
               <div className="flex items-center gap-2 ml-auto">
                 <Eye className="h-5 w-5" />
-                <span className="text-sm">{views > 999 ? `${(views / 1000).toFixed(1)}K` : views}</span>
+                <span className="text-sm">
+                  {views > 999 ? `${(views / 1000).toFixed(1)}K` : views}
+                </span>
               </div>
             )}
           </div>
@@ -110,18 +131,21 @@ export function MasonryCard({
         <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-2">
           {caption}
         </p>
-        
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
               <AvatarImage src={userAvatar} alt={user_name} />
-              <AvatarFallback className="text-xs">{user_name.charAt(0).toUpperCase()}</AvatarFallback>
+              <AvatarFallback className="text-xs">
+                {user_name ? user_name.charAt(0).toUpperCase() : 'A'}
+              </AvatarFallback>
             </Avatar>
             <span className="text-xs text-zinc-600 dark:text-zinc-400">{user_name}</span>
           </div>
-          
+
           <button
             onClick={handleLike}
+            aria-label={isLiked ? 'Unlike' : 'Like'}
             className={`transition-colors ${isLiked ? 'text-red-500' : 'text-zinc-400 hover:text-red-500'}`}
           >
             <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />

@@ -1,20 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import { ReelCard } from './ReelCard';
-import { X, ChevronUp, ChevronDown } from 'lucide-react';
-import { Button } from './ui/button';
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { Button } from "./ui/button";
+import { ReelCard } from "./ReelCard";
 
 interface Meme {
-  // id: string;
-  // type: 'image' | 'video';
-  // imageUrl?: string;
-  // videoUrl?: string;
-  // caption: string;
-  // user_name: string;
-  // userAvatar: string;
-  // likes: number;
-  // comments: number;
-  // views?: number;
-  // category?: string;
   id: string;
   title: string;
   file_url: string;
@@ -28,7 +17,7 @@ interface Meme {
   tags: string;
   downloads: number;
   created_at: string; // ISO date string
-  type: "image" | "video" ;
+  type: "image" | "video";
   language: string | null;
 }
 
@@ -40,125 +29,208 @@ interface ReelsViewProps {
 
 export function ReelsView({ reels, initialIndex = 0, onClose }: ReelsViewProps) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Scroll to initial reel after mount/layout
   useEffect(() => {
-    // Scroll to initial reel
-    if (containerRef.current) {
-      const element = containerRef.current.children[initialIndex] as HTMLElement;
-      if (element) {
-        element.scrollIntoView({ behavior: 'auto' });
-      }
-    }
+    const id = requestAnimationFrame(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const element = container.children[initialIndex] as HTMLElement | undefined;
+      element?.scrollIntoView({ behavior: "auto", block: "start" });
+      container.focus?.();
+    });
+    return () => cancelAnimationFrame(id);
   }, [initialIndex]);
 
+  // IntersectionObserver to update activeIndex
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const index = Array.from(container.children).indexOf(entry.target as HTMLElement);
-            setActiveIndex(index);
-          }
-        });
-      },
-      {
-        root: null,
-        threshold: 0.75,
-      }
-    );
+    const options: IntersectionObserverInit = {
+      root: container,
+      rootMargin: "0px",
+      threshold: 0.6, // at least 60% visible to be active
+    };
 
-    Array.from(container.children).forEach((child) => {
-      observer.observe(child);
-    });
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const index = Array.from(container.children).indexOf(entry.target as HTMLElement);
+          if (index >= 0) setActiveIndex(index);
+        }
+      });
+    }, options);
 
-    return () => observer.disconnect();
+    // observe only direct children (snap slides)
+    Array.from(container.children).forEach((child) => obs.observe(child));
+
+    return () => obs.disconnect();
   }, [reels]);
 
-  const goToPrevious = () => {
-    if (activeIndex > 0 && containerRef.current) {
-      const element = containerRef.current.children[activeIndex - 1] as HTMLElement;
-      element?.scrollIntoView({ behavior: 'smooth' });
+  // Helper to scroll to a specific index
+  const scrollToIndex = (index: number, behavior: ScrollBehavior = "smooth") => {
+    const container = containerRef.current;
+    if (!container) return;
+    const child = container.children[index] as HTMLElement | undefined;
+    if (!child) return;
+    child.scrollIntoView({ behavior, block: "start" });
+    // optimistic update
+    setActiveIndex(index);
+  };
+
+  // Toggle play/pause of media (video or audio) inside currently active reel
+  const togglePlayOnActive = () => {
+    const container = containerRef.current;
+    if (!container) return;
+    const activeChild = container.children[activeIndex] as HTMLElement | undefined;
+    if (!activeChild) return;
+    const media = activeChild.querySelector("video, audio") as HTMLMediaElement | null;
+    if (!media) {
+      console.warn("No media element found in active reel to toggle play/pause.");
+      return;
+    }
+    if (media.paused) {
+      media.play().catch((err) => {
+        console.warn("Unable to play media programmatically:", err);
+      });
+    } else {
+      media.pause();
     }
   };
 
-  const goToNext = () => {
-    if (activeIndex < reels.length - 1 && containerRef.current) {
-      const element = containerRef.current.children[activeIndex + 1] as HTMLElement;
-      element?.scrollIntoView({ behavior: 'smooth' });
-    }
+  // Keyboard handling: arrows + space
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // ignore when user is typing in an input/textarea/contenteditable area
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName?.toLowerCase();
+        const isEditable =
+          tag === "input" ||
+          tag === "textarea" ||
+          target.getAttribute("contenteditable") === "true" ||
+          (target as HTMLInputElement).isContentEditable;
+        if (isEditable) return;
+      }
+
+      switch (e.key) {
+        case "ArrowDown":
+        case "ArrowRight":
+          e.preventDefault();
+          if (activeIndex < reels.length - 1) scrollToIndex(activeIndex + 1);
+          break;
+
+        case "ArrowUp":
+        case "ArrowLeft":
+          e.preventDefault();
+          if (activeIndex > 0) scrollToIndex(activeIndex - 1);
+          break;
+
+        case " ":
+        case "Spacebar":
+          e.preventDefault();
+          togglePlayOnActive();
+          break;
+
+        default:
+          return;
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activeIndex, reels.length]);
+
+  const goPrev = () => {
+    if (activeIndex > 0) scrollToIndex(activeIndex - 1);
+  };
+  const goNext = () => {
+    if (activeIndex < reels.length - 1) scrollToIndex(activeIndex + 1);
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
-      {/* Close Button */}
+      {/* Top-left: Close */}
       <div className="absolute top-4 left-4 z-50">
         <Button
           variant="ghost"
           size="icon"
           onClick={onClose}
           className="text-white hover:bg-white/10 rounded-full h-10 w-10"
+          aria-label="Close reels"
         >
-          <X className="h-6 w-6" />
+          <ArrowLeft className="h-6 w-6" />
         </Button>
       </div>
 
-      {/* Reels Counter */}
-      <div className="absolute top-6 right-4 z-50 text-white text-sm bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full">
-        {activeIndex + 1} / {reels.length}
+      {/* Prev / Next controls (center-left & center-right) */}
+      <div className="absolute inset-y-0 left-2 z-40 flex items-center pointer-events-none">
+        <button
+          onClick={goPrev}
+          aria-label="Previous reel"
+          disabled={activeIndex === 0}
+          className={`pointer-events-auto rounded-full p-2 transition ${
+            activeIndex === 0 ? "opacity-40" : "opacity-90 hover:scale-105"
+          } bg-black/40 backdrop-blur-sm text-white`}
+          style={{ marginLeft: 4 }}
+        >
+          <ArrowLeft className="h-6 w-6" />
+        </button>
       </div>
 
-      {/* Navigation Buttons */}
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-4">
-        {activeIndex > 0 && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={goToPrevious}
-            className="text-white hover:bg-white/10 rounded-full h-12 w-12 bg-black/30 backdrop-blur-sm"
-          >
-            <ChevronUp className="h-8 w-8" />
-          </Button>
-        )}
-        {activeIndex < reels.length - 1 && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={goToNext}
-            className="text-white hover:bg-white/10 rounded-full h-12 w-12 bg-black/30 backdrop-blur-sm"
-          >
-            <ChevronDown className="h-8 w-8" />
-          </Button>
-        )}
+      <div className="absolute inset-y-0 right-2 z-40 flex items-center pointer-events-none">
+        <button
+          onClick={goNext}
+          aria-label="Next reel"
+          disabled={activeIndex === reels.length - 1}
+          className={`pointer-events-auto rounded-full p-2 transition ${
+            activeIndex === reels.length - 1 ? "opacity-40" : "opacity-90 hover:scale-105"
+          } bg-black/40 backdrop-blur-sm text-white`}
+          style={{ marginRight: 4 }}
+        >
+          <ArrowRight className="h-6 w-6" />
+        </button>
       </div>
 
-      {/* Reels Container */}
+      {/* Reels Container: full-height snap, gesture/swipe driven */}
       <div
         ref={containerRef}
-        className="h-full w-full overflow-y-auto snap-y snap-mandatory reels-scrollbar"
+        className="h-full w-full overflow-y-auto snap-y snap-mandatory touch-pan-y"
+        style={{ WebkitOverflowScrolling: "touch" }}
+        tabIndex={0}
+        onClick={() => containerRef.current?.focus()}
       >
         {reels.map((reel, index) => (
-          <ReelCard
+          <div
             key={reel.id}
-            {...reel}
-            isActive={activeIndex === index}
-          />
+            className="snap-start h-screen w-full flex items-center justify-center"
+            aria-hidden={activeIndex !== index}
+          >
+            <ReelCard {...reel} isActive={activeIndex === index} />
+          </div>
         ))}
       </div>
 
-      {/* Global styles for hiding scrollbar */}
+      {/* footer status (small) */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="text-xs text-white/80 bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
+          {activeIndex + 1} / {reels.length}
+        </div>
+      </div>
+
+      {/* helper styles */}
       <style>{`
-        .reels-scrollbar {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-        .reels-scrollbar::-webkit-scrollbar {
-          display: none;
-          width: 0;
-          height: 0;
+        .snap-y { scrollbar-width: none; -ms-overflow-style: none; }
+        .snap-y::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+        /* hide prev/next on very small screens (so they don't block content) */
+        @media (max-width: 480px) {
+          .absolute.inset-y-0.left-2,
+          .absolute.inset-y-0.right-2 {
+            display: none;
+          }
         }
       `}</style>
     </div>

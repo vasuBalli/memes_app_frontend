@@ -68,7 +68,7 @@ export function ReelCard({
   const [showCenterIcon, setShowCenterIcon] = useState(true);
   const [showTapHeart, setShowTapHeart] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const tapTimeoutRef = useRef<number | null>(null);
   const lastTapRef = useRef<number>(0);
 
@@ -129,21 +129,56 @@ export function ReelCard({
     togglePlayPause();
   };
 
+  // Keep component state in sync with actual media playback (important if parent controls media)
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    const onPlay = () => {
+      setIsPlaying(true);
+      setShowCenterIcon(false);
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      setShowCenterIcon(true);
+    };
+    const onEnded = () => {
+      setIsPlaying(false);
+      setShowCenterIcon(true);
+    };
+
+    v.addEventListener('play', onPlay);
+    v.addEventListener('pause', onPause);
+    v.addEventListener('ended', onEnded);
+
+    // ensure state matches current element state initially
+    setIsPlaying(!v.paused && !v.ended);
+
+    return () => {
+      v.removeEventListener('play', onPlay);
+      v.removeEventListener('pause', onPause);
+      v.removeEventListener('ended', onEnded);
+    };
+  }, []); // run only once (listeners are per-element instance)
+
   // Auto-play/pause on isActive (respect global mute)
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
 
+    // ensure muted state matches global preference
     v.muted = isMuted;
 
     if (isActive) {
-      v.play().then(() => {
-        setIsPlaying(true);
-        setShowCenterIcon(false);
-      }).catch(() => {
-        setIsPlaying(false);
-        setShowCenterIcon(true);
-      });
+      v.play()
+        .then(() => {
+          setIsPlaying(true);
+          setShowCenterIcon(false);
+        })
+        .catch(() => {
+          setIsPlaying(false);
+          setShowCenterIcon(true);
+        });
     } else {
       v.pause();
       setIsPlaying(false);
@@ -154,17 +189,21 @@ export function ReelCard({
   const togglePlayPause = () => {
     const v = videoRef.current;
     if (!v) return;
-    if (isPlaying) {
+    if (!v.paused) {
       v.pause();
       setIsPlaying(false);
       setShowCenterIcon(true);
     } else {
-      v.play().then(() => {
-        setIsPlaying(true);
-        setShowCenterIcon(true);
-        if (tapTimeoutRef.current) window.clearTimeout(tapTimeoutRef.current);
-        tapTimeoutRef.current = window.setTimeout(() => setShowCenterIcon(false), 300);
-      }).catch(() => {});
+      v.play()
+        .then(() => {
+          setIsPlaying(true);
+          setShowCenterIcon(true);
+          if (tapTimeoutRef.current) window.clearTimeout(tapTimeoutRef.current);
+          tapTimeoutRef.current = window.setTimeout(() => setShowCenterIcon(false), 300);
+        })
+        .catch((err) => {
+          console.warn('Failed to play media programmatically:', err);
+        });
     }
   };
 
@@ -183,41 +222,62 @@ export function ReelCard({
   }, []);
 
   return (
-    <div className="relative w-full h-screen flex items-center justify-center bg-black snap-start snap-always">
-      <div className="relative w-full h-full max-w-[640px] mx-auto overflow-hidden">
-        {type === 'video' && file_url ? (
-          <video
-            ref={videoRef}
-            src={file_url}
-            className="w-full h-full object-cover"
-            loop
-            playsInline
-            muted={isMuted}   // global
-          />
-        ) : (
-          <ImageWithFallback
-            src={file_url || ''}
-            alt={caption}
-            className="w-full h-full object-cover"
-          />
-        )}
+    <div className="relative w-full min-h-screen flex items-center justify-center bg-black snap-start snap-always">
+      <div className="relative w-full h-full max-w-[900px] mx-auto overflow-hidden">
+        {/* MEDIA WRAPPER: centers media, ensures top/bottom breathing room on mobile */}
+        <div
+          className="w-full flex items-center justify-center"
+          style={{
+            // leave some space above/below the visible media on mobile
+            paddingTop: 16,
+            paddingBottom: 16,
+            // ensure wrapper won't exceed viewport height
+            maxHeight: '100vh',
+          }}
+        >
+          {type === 'video' && file_url ? (
+            <video
+              ref={videoRef}
+              src={file_url}
+              // make video fully visible and centered, not cropped
+              className="max-w-full max-h-[calc(100vh-120px)] object-contain"
+              loop
+              playsInline
+              preload="metadata"
+              muted={isMuted}   // global
+              data-reel-media
+              aria-label={caption || 'Reel video'}
+              // inline style fallback for older environments
+              style={{ width: 'auto', height: 'auto', maxWidth: '100%' }}
+            />
+          ) : (
+            <ImageWithFallback
+              src={file_url || ''}
+              alt={caption}
+              className="max-w-full max-h-[calc(100vh-120px)] object-contain"
+              // ensure image is centered and visible
+              style={{ width: 'auto', height: 'auto', maxWidth: '100%' }}
+            />
+          )}
+        </div>
 
-        {/* dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 pointer-events-none" />
+        {/* dark gradient overlay (keeps edges readable) */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/12 via-transparent to-black/60 pointer-events-none" />
 
-        {/* Tap zone (play/pause + double-tap like) */}
+        {/* Tap zone (play/pause + double-tap like) - keep large hit area for mobile */}
         {type === 'video' && (
           <button
             aria-label={isPlaying ? 'Pause video' : 'Play video'}
             onClick={handleTapAreaClick}
-            className="absolute inset-0"
+            className="absolute inset-0 touch-manipulation"
+            style={{ touchAction: 'manipulation' }}
           />
         )}
 
-        {/* Center play/pause visual cue */}
+        {/* Center play/pause visual cue (slightly larger on mobile) */}
         {type === 'video' && showCenterIcon && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="bg-black/50 backdrop-blur-sm rounded-full p-4">
+            <div className="bg-black/50 backdrop-blur-sm rounded-full p-4 md:p-4">
               {isPlaying ? (
                 <Pause className="h-12 w-12 text-white" />
               ) : (
@@ -244,7 +304,7 @@ export function ReelCard({
           </div>
 
           {/* Right action rail */}
-          <div className="flex flex-col items-center gap-4 pointer-events-auto">
+          <div className="flex flex-col bottom-0 items-center gap-4 pointer-events-auto">
             <button
               onClick={handleLikeClick}
               aria-label={isLiked ? 'Unlike' : 'Like'}
@@ -299,6 +359,18 @@ export function ReelCard({
           </div>
         </div>
       </div>
+
+      {/* small inline styles to help mobile rendering (no stylesheet required) */}
+      <style>{`
+        /* prefer contain so the full video is visible, plus keep it centered */
+        .object-contain { object-fit: contain; object-position: center; }
+        /* helper for better touch handling on mobile */
+        .touch-manipulation { -webkit-tap-highlight-color: transparent; }
+        @media (max-width: 640px) {
+          /* give slightly more breathing room on smaller screens */
+          .max-h-\\[calc\\(100vh-120px\\)\\] { max-height: calc(100vh - 120px); }
+        }
+      `}</style>
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Button } from "./ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { AvatarWithIdenticon } from "../components/AvatarWithIdenticon";
 import { Badge } from "./ui/badge";
 import { motion } from "motion/react";
 import {
@@ -19,7 +19,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { AvatarWithIdenticon } from "../components/AvatarWithIdenticon";
 
 /** ---------- Global Mute Bus (single-file, no extra Provider needed) ---------- */
 const GLOBAL_MUTE_KEY = "__meme_global_muted__";
@@ -61,6 +60,8 @@ interface MemeCardProps {
   created_at: string; // ISO date string
   type: "image" | "video" | string; // tolerant at runtime
   language: string | null;
+  // NEW: optional prop so parent can get the actual <video> element
+  videoRef?: (el: HTMLVideoElement | null) => void;
 }
 
 export function MemeCard({
@@ -74,7 +75,8 @@ export function MemeCard({
   comments,
   category,
   type,
-  tags
+  tags,
+  videoRef: externalVideoRef,
 }: MemeCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -82,7 +84,7 @@ export function MemeCard({
 
   // video wiring
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const isVideo = (type?.toString?.().toLowerCase?.() ?? "") === "video";
   const hasVideo = isVideo && !!file_url;
@@ -157,16 +159,23 @@ export function MemeCard({
     e.stopPropagation();
     const next = !isMuted;
     writeGlobalMuted(next); // updates localStorage + dispatches event
-    // Local state updates via the event listener; but we can optimistically update:
+    // optimistic local update (listeners will also update)
     setIsMuted(next);
   };
 
-  const handleLike = () => {
+  const handleLike = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setIsLiked((prev) => {
       const next = !prev;
       setLikes((l) => Math.max(0, l + (next ? 1 : -1)));
       return next;
     });
+  };
+
+  // helper to attach refs: keep local ref + notify parent
+  const handleVideoRef = (el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (externalVideoRef) externalVideoRef(el);
   };
 
   return (
@@ -175,21 +184,17 @@ export function MemeCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors shadow-sm hover:shadow-md"
+      className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors shadow-sm hover:shadow-md cursor-pointer"
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          {/* <Avatar className="h-10 w-10 ring-2 ring-zinc-100 dark:ring-zinc-800">
-            <AvatarImage src={userAvatar} alt={user_name} />
-            <AvatarFallback>{user_name ? user_name.charAt(0).toUpperCase() : ""}</AvatarFallback>
-          </Avatar> */}
-                      <AvatarWithIdenticon
-              user_name={user_name}
-              src={userAvatar}
-              size={40}
-              className="ring-2 ring-zinc-100 dark:ring-zinc-800"
-            />
+          <AvatarWithIdenticon
+            user_name={user_name}
+            src={userAvatar}
+            size={40}
+            className="ring-2 ring-zinc-100 dark:ring-zinc-800"
+          />
           <div className="flex flex-col">
             <span className="text-sm text-zinc-900 dark:text-white">{user_name}</span>
             {category && (
@@ -226,9 +231,9 @@ export function MemeCard({
         {hasVideo && (
           <div className="relative">
             <video
-              ref={videoRef}
+              ref={handleVideoRef}
               src={file_url}
-              className="w-full h-auto max-h-[700px]"
+              className="w-full h-auto max-h-[700px] object-contain"
               loop
               autoPlay
               muted={isMuted}
@@ -241,7 +246,7 @@ export function MemeCard({
             <button
               onClick={toggleGlobalMute}
               aria-label={isMuted ? "Unmute video (global)" : "Mute video (global)"}
-              className="absolute bottom-3 right-3 z-20 pointer-events-auto rounded-full bg-black/60 hover:bg-black/70 p-2 transition"
+              className="absolute bottom-0 right-0 z-20 pointer-events-auto rounded-full bg-black/60 hover:bg-black/70 p-2 transition"
             >
               {isMuted ? (
                 <VolumeX className="h-4 w-4 text-white" />
@@ -277,7 +282,10 @@ export function MemeCard({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsSaved(!isSaved)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsSaved(!isSaved);
+            }}
             className={`h-9 w-9 transition-colors ${
               isSaved ? "text-blue-500 hover:text-blue-600" : "hover:text-blue-500"
             }`}
@@ -288,7 +296,13 @@ export function MemeCard({
 
         {/* Likes */}
         <div>
-          <button className="text-sm text-zinc-900 dark:text-white hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              /* optionally open likes modal */
+            }}
+            className="text-sm text-zinc-900 dark:text-white hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+          >
             {likes ? likes.toLocaleString() : ""} likes
           </button>
         </div>
@@ -297,18 +311,20 @@ export function MemeCard({
         <div className="space-y-1">
           <p className="text-sm text-zinc-900 dark:text-white">
             <span className="mr-2">{title}</span>
-            {/* <span className="text-zinc-700 dark:text-zinc-300">{title}</span> */}
           </p>
         </div>
 
         {/* Comments */}
         {comments > 0 && (
-          <button className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">
+          <button
+            onClick={(e) => e.stopPropagation()}
+            className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+          >
             View all {comments.toLocaleString()} comments
           </button>
         )}
 
-        {/* Timestamp */}
+        {/* Timestamp / tags */}
         <p className="text-xs text-zinc-400 dark:text-zinc-500">{tags}</p>
       </div>
     </motion.article>
